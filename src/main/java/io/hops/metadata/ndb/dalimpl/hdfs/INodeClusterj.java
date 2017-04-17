@@ -162,6 +162,14 @@ public class INodeClusterj implements TablesDef.INodeTableDef, INodeDataAccess<I
     @Column(name = SIZE)
     long getSize();
     void setSize(long size);
+
+    @Column(name = LAST_VERSION)
+    long getLastVersion();
+    void setLastVersion(long lastVersion);
+
+    @Column(name = N_VERSIONS)
+    int getNVersions();
+    void setNVersions(int nVersions);
   }
 
   private ClusterjConnector connector = ClusterjConnector.getInstance();
@@ -598,7 +606,7 @@ public class INodeClusterj implements TablesDef.INodeTableDef, INodeDataAccess<I
         NdbBoolean.convert(persistable.getSubtreeLocked()),
         persistable.getSubtreeLockOwner(),
         NdbBoolean.convert(persistable.getMetaEnabled()),
-        persistable.getSize());
+        persistable.getSize(), persistable.getLastVersion(), persistable.getNVersions());
     return node;
   }
 
@@ -625,6 +633,7 @@ public class INodeClusterj implements TablesDef.INodeTableDef, INodeDataAccess<I
     persistable.setSize(inode.getFileSize());
     persistable.setIsDir(NdbBoolean.convert(inode.isDirectory()));
     persistable.setPartitionId(inode.getPartitionId());
+    persistable.setLastVersion(inode.getLastVersion());
   }
 
   private void explain(HopsQuery<InodeDTO> query) {
