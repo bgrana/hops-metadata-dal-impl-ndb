@@ -97,9 +97,9 @@ public class BlockInfoClusterj
     void setBlockRecoveryId(long recoveryId);
 
     @Column(name = BLOCK_VERSION)
-    long getBlockVersion();
+    int getBlockVersion();
 
-    void setBlockVersion(long blockVersion);
+    void setBlockVersion(int blockVersion);
   }
   private ClusterjConnector connector = ClusterjConnector.getInstance();
   private final static int NOT_FOUND_ROW = -1000;
