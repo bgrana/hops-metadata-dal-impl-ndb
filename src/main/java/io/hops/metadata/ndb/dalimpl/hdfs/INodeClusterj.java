@@ -164,12 +164,8 @@ public class INodeClusterj implements TablesDef.INodeTableDef, INodeDataAccess<I
     void setSize(long size);
 
     @Column(name = LAST_VERSION)
-    long getLastVersion();
-    void setLastVersion(long lastVersion);
-
-    @Column(name = N_VERSIONS)
-    int getNVersions();
-    void setNVersions(int nVersions);
+    int getLastVersion();
+    void setLastVersion(int lastVersion);
   }
 
   private ClusterjConnector connector = ClusterjConnector.getInstance();
@@ -606,7 +602,7 @@ public class INodeClusterj implements TablesDef.INodeTableDef, INodeDataAccess<I
         NdbBoolean.convert(persistable.getSubtreeLocked()),
         persistable.getSubtreeLockOwner(),
         NdbBoolean.convert(persistable.getMetaEnabled()),
-        persistable.getSize(), persistable.getLastVersion(), persistable.getNVersions());
+        persistable.getSize(), persistable.getLastVersion());
     return node;
   }
 
