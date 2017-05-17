@@ -38,12 +38,13 @@ import io.hops.metadata.ndb.wrapper.HopsSession;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 public class BlockInfoClusterj
         implements TablesDef.BlockInfoTableDef, BlockInfoDataAccess<BlockInfo> {
+
+  private final int MAX_VERSION_NUMBER = 100000;
 
   @PersistenceCapable(table = TABLE_NAME)
   @PartitionKey(column = INODE_ID)
@@ -285,6 +286,56 @@ public class BlockInfoClusterj
     HopsSession session = connector.obtainSession();
     List<BlockInfo> blks = readBlockInfoBatch(session, inodeIds, blockIds);
     return blks;
+  }
+
+  @Override
+  public List<BlockInfo> findCompleteBlocksByINodeIdAndPrevVersion(int iNodeId, int version) throws StorageException {
+    HopsSession session = connector.obtainSession();
+    HopsQueryBuilder qb = session.getQueryBuilder();
+    HopsQueryDomainType<BlockInfoDTO> dobj =
+            qb.createQueryDefinition(BlockInfoClusterj.BlockInfoDTO.class);
+
+    HopsPredicate pred1 =dobj.get("iNodeId").equal(dobj.param("iNodeParam"))
+            .and(dobj.get("BlockUCState").equal(dobj.param("BlockUCStateParam")));
+    dobj.where(pred1);
+    HopsQuery<BlockInfoDTO> query = session.createQuery(dobj);
+    query.setParameter("iNodeParam", iNodeId);
+    query.setParameter("BlockUCStateParam", 3); // TODO: Find out the value for 'completed'
+
+    List<BlockInfoDTO> dtos = query.getResultList();
+    List<BlockInfo> initialList = createBlockInfoList(dtos);
+    List<BlockInfo> lbis = new ArrayList<>();
+    for (BlockInfo bi : initialList) {
+      if (bi.getBlockId()% MAX_VERSION_NUMBER < version) {
+        lbis.add(bi);
+      }
+    }
+    session.release(dtos);
+    return lbis;
+  }
+
+  @Override
+  public List<BlockInfo> findByINodeIdAndVersion(int iNodeId, int version) throws StorageException {
+    HopsSession session = connector.obtainSession();
+    HopsQueryBuilder qb = session.getQueryBuilder();
+    HopsQueryDomainType<BlockInfoDTO> dobj =
+            qb.createQueryDefinition(BlockInfoClusterj.BlockInfoDTO.class);
+
+    HopsPredicate pred1 = dobj.get("iNodeId").equal(dobj.param("iNodeParam"));
+    dobj.where(pred1);
+    HopsQuery<BlockInfoDTO> query = session.createQuery(dobj);
+    query.setParameter("iNodeParam", iNodeId);
+
+    List<BlockInfoDTO> dtos = query.getResultList();
+    List<BlockInfo> initialList = createBlockInfoList(dtos);
+    List<BlockInfo> lbis = new ArrayList<>();
+    for (BlockInfo bi : initialList) {
+      if (bi.getBlockId()% MAX_VERSION_NUMBER == version) {
+        lbis.add(bi);
+      }
+    }
+    session.release(dtos);
+    return lbis;
   }
 
   private List<BlockInfo> readBlockInfoBatch(final HopsSession session,
