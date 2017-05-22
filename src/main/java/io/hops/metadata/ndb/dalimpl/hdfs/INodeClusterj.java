@@ -164,8 +164,8 @@ public class INodeClusterj implements TablesDef.INodeTableDef, INodeDataAccess<I
     void setSize(long size);
 
     @Column(name = LAST_VERSION)
-    int getLastVersion();
-    void setLastVersion(int lastVersion);
+    byte getLastVersion();
+    void setLastVersion(byte lastVersion);
   }
 
   private ClusterjConnector connector = ClusterjConnector.getInstance();
