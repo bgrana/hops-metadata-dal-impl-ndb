@@ -44,7 +44,8 @@ import java.util.Set;
 public class BlockInfoClusterj
         implements TablesDef.BlockInfoTableDef, BlockInfoDataAccess<BlockInfo> {
 
-  private final int MAX_VERSION_NUMBER = 100000;
+  private final long BLOCK_VERSION_MASK = 0x00000000000000FFL;
+  private final byte MAX_VERSION = 10;
 
   @PersistenceCapable(table = TABLE_NAME)
   @PartitionKey(column = INODE_ID)
@@ -289,7 +290,7 @@ public class BlockInfoClusterj
   }
 
   @Override
-  public List<BlockInfo> findCompleteBlocksByINodeIdAndPrevVersion(int iNodeId, int version) throws StorageException {
+  public List<BlockInfo> findCompleteBlocksByINodeIdAndPrevVersion(int iNodeId, byte version, byte lastVersion) throws StorageException {
     HopsSession session = connector.obtainSession();
     HopsQueryBuilder qb = session.getQueryBuilder();
     HopsQueryDomainType<BlockInfoDTO> dobj =
@@ -305,9 +306,27 @@ public class BlockInfoClusterj
     List<BlockInfoDTO> dtos = query.getResultList();
     List<BlockInfo> initialList = createBlockInfoList(dtos);
     List<BlockInfo> lbis = new ArrayList<>();
+
+    //TODO: This code is a bit convoluted. Refactor if possible.
     for (BlockInfo bi : initialList) {
-      if (bi.getBlockId()% MAX_VERSION_NUMBER < version) {
-        lbis.add(bi);
+      byte blockVersion = (byte) (bi.getBlockId() & BLOCK_VERSION_MASK);
+
+      // If version > lastVersion take all blocks with blockVersion between version and lastVersion
+      // (not included) and completed old blocks (version = MAX_VERSION +1)
+      if (version > lastVersion) {
+        if ((blockVersion < version && blockVersion > lastVersion) || blockVersion == MAX_VERSION + 1) {
+          lbis.add(bi);
+        }
+      }
+
+      // If version <= lastVersion take all blocks with blockVersion lower than version or
+      // blockVersion higher than lastVersion (not included). Case of old completed blocks
+      // (blockVersion == MAX_VERSION + 1) is omitted because blockVersion > lastVersion
+      // covers the case.
+      else {
+        if (blockVersion < version || blockVersion > lastVersion) {
+          lbis.add(bi);
+        }
       }
     }
     session.release(dtos);
@@ -315,7 +334,7 @@ public class BlockInfoClusterj
   }
 
   @Override
-  public List<BlockInfo> findByINodeIdAndVersion(int iNodeId, int version) throws StorageException {
+  public List<BlockInfo> findByINodeIdAndVersion(int iNodeId, byte version) throws StorageException {
     HopsSession session = connector.obtainSession();
     HopsQueryBuilder qb = session.getQueryBuilder();
     HopsQueryDomainType<BlockInfoDTO> dobj =
@@ -330,7 +349,7 @@ public class BlockInfoClusterj
     List<BlockInfo> initialList = createBlockInfoList(dtos);
     List<BlockInfo> lbis = new ArrayList<>();
     for (BlockInfo bi : initialList) {
-      if (bi.getBlockId()% MAX_VERSION_NUMBER == version) {
+      if ((bi.getBlockId() & BLOCK_VERSION_MASK) == version) {
         lbis.add(bi);
       }
     }
