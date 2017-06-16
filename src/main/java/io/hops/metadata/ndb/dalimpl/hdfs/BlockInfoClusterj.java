@@ -290,7 +290,7 @@ public class BlockInfoClusterj
   }
 
   @Override
-  public List<BlockInfo> findCompleteBlocksByINodeIdAndPrevVersion(int iNodeId, byte version, byte lastVersion) throws StorageException {
+  public List<BlockInfo> findCompleteBlocksByINodeIdAndPrevVersion(int iNodeId, int version, int lastVersion) throws StorageException {
     HopsSession session = connector.obtainSession();
     HopsQueryBuilder qb = session.getQueryBuilder();
     HopsQueryDomainType<BlockInfoDTO> dobj =
@@ -309,7 +309,7 @@ public class BlockInfoClusterj
 
     //TODO: This code is a bit convoluted. Refactor if possible.
     for (BlockInfo bi : initialList) {
-      byte blockVersion = (byte) (bi.getBlockId() & BLOCK_VERSION_MASK);
+      int blockVersion = (int) (bi.getBlockId() & BLOCK_VERSION_MASK);
 
       // If version > lastVersion take all blocks with blockVersion between version and lastVersion
       // (not included) and completed old blocks (version = MAX_VERSION +1)
@@ -334,7 +334,7 @@ public class BlockInfoClusterj
   }
 
   @Override
-  public List<BlockInfo> findByINodeIdAndVersion(int iNodeId, byte version) throws StorageException {
+  public List<BlockInfo> findByINodeIdAndVersion(int iNodeId, int version) throws StorageException {
     HopsSession session = connector.obtainSession();
     HopsQueryBuilder qb = session.getQueryBuilder();
     HopsQueryDomainType<BlockInfoDTO> dobj =
