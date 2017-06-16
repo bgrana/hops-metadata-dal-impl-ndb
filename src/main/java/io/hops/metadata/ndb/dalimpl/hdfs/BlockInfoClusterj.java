@@ -45,7 +45,20 @@ public class BlockInfoClusterj
         implements TablesDef.BlockInfoTableDef, BlockInfoDataAccess<BlockInfo> {
 
   private final long BLOCK_VERSION_MASK = 0x00000000000000FFL;
-  private final byte MAX_VERSION = 10;
+  // Version numbers must all be in the range of an unsigned
+  // byte [0-256). There are two types of versions: automatic,
+  // used in automatic snapshots on file change, and on-demand,
+  // used for on-demand snapshots requested byt the user.
+
+  // Automatic version max number is between 0 and 170
+  private static final int MAX_AUTO_VERSION = 10;
+
+  // On-demand version numbers must be in the range [172,256).
+  // Old completed blocks are always stored as (MAX_AUTO_VERSION+1)
+  // so version 171 is reserved for the case in which
+  // MAX_AUTO_VERSION = 170
+  private static final int MIN_ON_DEMAN_VERSION = 172;
+  private static final int MAX_ON_DEMAND_VERSION = 182;
 
   @PersistenceCapable(table = TABLE_NAME)
   @PartitionKey(column = INODE_ID)
@@ -312,16 +325,16 @@ public class BlockInfoClusterj
       int blockVersion = (int) (bi.getBlockId() & BLOCK_VERSION_MASK);
 
       // If version > lastVersion take all blocks with blockVersion between version and lastVersion
-      // (not included) and completed old blocks (version = MAX_VERSION +1)
+      // (not included) and completed old blocks (version = MAX_AUTO_VERSION +1)
       if (version > lastVersion) {
-        if ((blockVersion < version && blockVersion > lastVersion) || blockVersion == MAX_VERSION + 1) {
+        if ((blockVersion < version && blockVersion > lastVersion) || blockVersion == MAX_AUTO_VERSION + 1) {
           lbis.add(bi);
         }
       }
 
       // If version <= lastVersion take all blocks with blockVersion lower than version or
       // blockVersion higher than lastVersion (not included). Case of old completed blocks
-      // (blockVersion == MAX_VERSION + 1) is omitted because blockVersion > lastVersion
+      // (blockVersion == MAX_AUTO_VERSION + 1) is omitted because blockVersion > lastVersion
       // covers the case.
       else {
         if (blockVersion < version || blockVersion > lastVersion) {
