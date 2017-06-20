@@ -110,6 +110,11 @@ public class BlockInfoClusterj
     long getBlockRecoveryId();
 
     void setBlockRecoveryId(long recoveryId);
+
+    @Column(name = IS_OLD_BLOCK)
+    boolean isOldBlock();
+
+    void setOldBlock(boolean isOldBlock);
   }
   private ClusterjConnector connector = ClusterjConnector.getInstance();
   private final static int NOT_FOUND_ROW = -1000;
@@ -325,17 +330,14 @@ public class BlockInfoClusterj
       int blockVersion = (int) (bi.getBlockId() & BLOCK_VERSION_MASK);
 
       // If version > lastVersion take all blocks with blockVersion between version and lastVersion
-      // (not included) and completed old blocks (version = MAX_AUTO_VERSION +1)
       if (version > lastVersion) {
-        if ((blockVersion < version && blockVersion > lastVersion) || blockVersion == MAX_AUTO_VERSION + 1) {
+        if (blockVersion < version && blockVersion > lastVersion) {
           lbis.add(bi);
         }
       }
 
       // If version <= lastVersion take all blocks with blockVersion lower than version or
-      // blockVersion higher than lastVersion (not included). Case of old completed blocks
-      // (blockVersion == MAX_AUTO_VERSION + 1) is omitted because blockVersion > lastVersion
-      // covers the case.
+      // blockVersion higher than lastVersion (not included).
       else {
         if (blockVersion < version || blockVersion > lastVersion) {
           lbis.add(bi);
@@ -362,7 +364,7 @@ public class BlockInfoClusterj
     List<BlockInfo> initialList = createBlockInfoList(dtos);
     List<BlockInfo> lbis = new ArrayList<>();
     for (BlockInfo bi : initialList) {
-      if ((bi.getBlockId() & BLOCK_VERSION_MASK) == version) {
+      if ((bi.getBlockId() & BLOCK_VERSION_MASK) == version && !bi.isOldBlock()) {
         lbis.add(bi);
       }
     }
@@ -406,7 +408,8 @@ public class BlockInfoClusterj
             new BlockInfo(bDTO.getBlockId(), bDTO.getBlockIndex(),
             bDTO.getINodeId(), bDTO.getNumBytes(), bDTO.getGenerationStamp(),
             bDTO.getBlockUCState(), bDTO.getTimestamp(),
-            bDTO.getPrimaryNodeIndex(), bDTO.getBlockRecoveryId());
+            bDTO.getPrimaryNodeIndex(), bDTO.getBlockRecoveryId(),
+            bDTO.isOldBlock());
     return hopBlockInfo;
   }
 
@@ -421,5 +424,6 @@ public class BlockInfoClusterj
     persistable.setBlockUCState(block.getBlockUCState());
     persistable.setPrimaryNodeIndex(block.getPrimaryNodeIndex());
     persistable.setBlockRecoveryId(block.getBlockRecoveryId());
+    persistable.setOldBlock(block.isOldBlock());
   }
 }

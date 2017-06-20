@@ -10,6 +10,7 @@ CREATE TABLE `hdfs_block_infos` (
   `time_stamp` bigint(20) DEFAULT NULL,
   `primary_node_index` int(11) DEFAULT NULL,
   `block_recovery_id` bigint(20) DEFAULT NULL,
+  `is_old_block` boolean DEFAULT FALSE,
   PRIMARY KEY (`inode_id`,`block_id`)
 ) ENGINE=ndbcluster DEFAULT CHARSET=latin1
 /*!50100 PARTITION BY KEY (inode_id) */$$
