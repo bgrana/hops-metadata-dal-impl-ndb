@@ -331,7 +331,7 @@ public class BlockInfoClusterj
 
       // If version > lastVersion take all blocks with blockVersion between version and lastVersion
       if (version > lastVersion) {
-        if (blockVersion < version && blockVersion > lastVersion) {
+        if ((blockVersion < version && blockVersion > lastVersion) || bi.isOldBlock()) {
           lbis.add(bi);
         }
       }
@@ -339,7 +339,7 @@ public class BlockInfoClusterj
       // If version <= lastVersion take all blocks with blockVersion lower than version or
       // blockVersion higher than lastVersion (not included).
       else {
-        if (blockVersion < version || blockVersion > lastVersion) {
+        if (blockVersion < version || blockVersion > lastVersion || bi.isOldBlock()) {
           lbis.add(bi);
         }
       }
