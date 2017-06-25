@@ -46,19 +46,21 @@ public class BlockInfoClusterj
 
   private final long BLOCK_VERSION_MASK = 0x00000000000000FFL;
   // Version numbers must all be in the range of an unsigned
-  // byte [0-256). There are two types of versions: automatic,
+  // byte [0-255]. There are two types of versions: automatic,
   // used in automatic snapshots on file change, and on-demand,
   // used for on-demand snapshots requested byt the user.
 
-  // Automatic version max number is between 0 and 170
-  private static final int MAX_AUTO_VERSION = 10;
+  // Automatic version numbers must be in the range [0,171]
+  // This constant delimits the upper (inclusive) bound for
+  // automatic version numbers
+  public static final int MIN_AUTO_VERSION = 0;
+  public static final int MAX_AUTO_VERSION = 10;
 
-  // On-demand version numbers must be in the range [172,256).
-  // Old completed blocks are always stored as (MAX_AUTO_VERSION+1)
-  // so version 171 is reserved for the case in which
-  // MAX_AUTO_VERSION = 170
-  private static final int MIN_ON_DEMAN_VERSION = 172;
-  private static final int MAX_ON_DEMAND_VERSION = 182;
+  // On-demand version numbers must be in the range [172,255]
+  // These constants delimit the lower and upper (inclusive)
+  // bounds for on-demand snapshots version numbers
+  public static final int MIN_ON_DEMAND_VERSION = 172;
+  public static final int MAX_ON_DEMAND_VERSION = 182;
 
   @PersistenceCapable(table = TABLE_NAME)
   @PartitionKey(column = INODE_ID)
