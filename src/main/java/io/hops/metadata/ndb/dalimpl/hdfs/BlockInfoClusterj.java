@@ -310,7 +310,8 @@ public class BlockInfoClusterj
   }
 
   @Override
-  public List<BlockInfo> findCompleteBlocksByINodeIdAndPrevVersion(int iNodeId, int version, int lastVersion) throws StorageException {
+  public List<BlockInfo> findCompleteBlocksByINodeIdAndPrevVersion(int iNodeId, int version, int lastVersion)
+          throws StorageException {
     HopsSession session = connector.obtainSession();
     HopsQueryBuilder qb = session.getQueryBuilder();
     HopsQueryDomainType<BlockInfoDTO> dobj =
@@ -327,13 +328,28 @@ public class BlockInfoClusterj
     List<BlockInfo> initialList = createBlockInfoList(dtos);
     List<BlockInfo> lbis = new ArrayList<>();
 
+    // Select automatic or onDemand versions based on the range
+    int min = lastVersion <= MAX_AUTO_VERSION ? MIN_AUTO_VERSION : MIN_ON_DEMAND_VERSION;
+    int max = lastVersion <= MAX_AUTO_VERSION ? MAX_AUTO_VERSION : MAX_ON_DEMAND_VERSION;
+
     //TODO: This code is a bit convoluted. Refactor if possible.
     for (BlockInfo bi : initialList) {
       int blockVersion = (int) (bi.getBlockId() & BLOCK_VERSION_MASK);
 
-      // If version > lastVersion take all blocks with blockVersion between version and lastVersion
-      if (version > lastVersion) {
-        if ((blockVersion < version && blockVersion > lastVersion) || bi.isOldBlock()) {
+      // If version is outside the boundaries (is an onDemand version when we are looking
+      // for an auto version or viceversa) skip this block
+      if (blockVersion < min || blockVersion > max) {
+        continue;
+      }
+      // If version == lastVersion take all completed blocks
+      if (version == lastVersion) {
+        lbis.add(bi);
+      }
+
+      // If version > lastVersion take all blocks marked as old or with blockVersion
+      // between version and lastVersion
+      else if (version > lastVersion) {
+        if ((lastVersion < blockVersion && blockVersion < version) || bi.isOldBlock()) {
           lbis.add(bi);
         }
       }
