@@ -46,21 +46,9 @@ public class BlockInfoClusterj
 
   private final long BLOCK_VERSION_MASK = 0x00000000000000FFL;
   // Version numbers must all be in the range of an unsigned
-  // byte [0-255]. There are two types of versions: automatic,
-  // used in automatic snapshots on file change, and on-demand,
-  // used for on-demand snapshots requested byt the user.
-
-  // Automatic version numbers must be in the range [0,171]
-  // This constant delimits the upper (inclusive) bound for
-  // automatic version numbers
-  public static final int MIN_AUTO_VERSION = 0;
-  public static final int MAX_AUTO_VERSION = 10;
-
-  // On-demand version numbers must be in the range [172,255]
-  // These constants delimit the lower and upper (inclusive)
-  // bounds for on-demand snapshots version numbers
-  public static final int MIN_ON_DEMAND_VERSION = 172;
-  public static final int MAX_ON_DEMAND_VERSION = 182;
+  // byte [0-255].
+  public static final int MIN_VERSION = 0;
+  public static final int MAX_VERSION = 10;
 
   @PersistenceCapable(table = TABLE_NAME)
   @PartitionKey(column = INODE_ID)
@@ -117,6 +105,16 @@ public class BlockInfoClusterj
     boolean isOldBlock();
 
     void setOldBlock(boolean isOldBlock);
+
+    @Column(name = IS_ON_DEMAND)
+    boolean isOnDemand();
+
+    void setOnDemand(boolean onDemand);
+
+    @Column(name = IS_IN_ROTATION)
+    boolean isInRotation();
+
+    void setInRotation(boolean inRotation);
   }
   private ClusterjConnector connector = ClusterjConnector.getInstance();
   private final static int NOT_FOUND_ROW = -1000;
@@ -328,17 +326,12 @@ public class BlockInfoClusterj
     List<BlockInfo> initialList = createBlockInfoList(dtos);
     List<BlockInfo> lbis = new ArrayList<>();
 
-    // Select automatic or onDemand versions based on the range
-    int min = lastVersion <= MAX_AUTO_VERSION ? MIN_AUTO_VERSION : MIN_ON_DEMAND_VERSION;
-    int max = lastVersion <= MAX_AUTO_VERSION ? MAX_AUTO_VERSION : MAX_ON_DEMAND_VERSION;
-
     //TODO: This code is a bit convoluted. Refactor if possible.
     for (BlockInfo bi : initialList) {
       int blockVersion = (int) (bi.getBlockId() & BLOCK_VERSION_MASK);
 
-      // If version is outside the boundaries (is an onDemand version when we are looking
-      // for an auto version or viceversa) skip this block
-      if (blockVersion < min || blockVersion > max) {
+      // If version is outside the boundaries skip this block (this should never happen)
+      if (blockVersion < MIN_VERSION || blockVersion > MAX_VERSION) {
         continue;
       }
       // If version == lastVersion take all completed blocks
@@ -367,25 +360,73 @@ public class BlockInfoClusterj
   }
 
   @Override
-  public List<BlockInfo> findByINodeIdAndVersion(int iNodeId, int version) throws StorageException {
+  public List<BlockInfo> findByINodeIdAndVersion(int iNodeId, int version, boolean onlyOnDemand) throws StorageException {
     HopsSession session = connector.obtainSession();
     HopsQueryBuilder qb = session.getQueryBuilder();
     HopsQueryDomainType<BlockInfoDTO> dobj =
             qb.createQueryDefinition(BlockInfoClusterj.BlockInfoDTO.class);
 
-    HopsPredicate pred1 = dobj.get("iNodeId").equal(dobj.param("iNodeParam"));
+    HopsPredicate pred1 = dobj.get("iNodeId").equal(dobj.param("iNodeParam"))
+            .and(dobj.get("isOnDemand").equal(dobj.param("isOnDemandParam")))
+            .and(dobj.get("isOldBlock").equal(dobj.param("isOldBlockParam")));
     dobj.where(pred1);
     HopsQuery<BlockInfoDTO> query = session.createQuery(dobj);
     query.setParameter("iNodeParam", iNodeId);
+    query.setParameter("isOnDemandParam", onlyOnDemand);
+    query.setParameter("isOldBlockParam", false);
 
     List<BlockInfoDTO> dtos = query.getResultList();
     List<BlockInfo> initialList = createBlockInfoList(dtos);
     List<BlockInfo> lbis = new ArrayList<>();
     for (BlockInfo bi : initialList) {
-      if ((bi.getBlockId() & BLOCK_VERSION_MASK) == version && !bi.isOldBlock()) {
+      if ((bi.getBlockId() & BLOCK_VERSION_MASK) == version /*&& !bi.isOldBlock()*/) {
         lbis.add(bi);
       }
     }
+    session.release(dtos);
+    return lbis;
+  }
+
+  @Override
+  public List<BlockInfo> findOnDemandVersionsByINodeId(int iNodeId) throws StorageException {
+    HopsSession session = connector.obtainSession();
+    HopsQueryBuilder qb = session.getQueryBuilder();
+    HopsQueryDomainType<BlockInfoDTO> dobj =
+            qb.createQueryDefinition(BlockInfoClusterj.BlockInfoDTO.class);
+
+    HopsPredicate pred1 = dobj.get("iNodeId").equal(dobj.param("iNodeParam"))
+            .and(dobj.get("isOnDemand").equal(dobj.param("isOnDemandParam")))
+            .and(dobj.get("isOldBlock").equal(dobj.param("isOldBlockParam")));
+    dobj.where(pred1);
+    HopsQuery<BlockInfoDTO> query = session.createQuery(dobj);
+    query.setParameter("iNodeParam", iNodeId);
+    query.setParameter("isOnDemandParam", true);
+    query.setParameter("isOldBlockParam", false);
+
+    List<BlockInfoDTO> dtos = query.getResultList();
+    List<BlockInfo> lbis = createBlockInfoList(dtos);
+
+    session.release(dtos);
+    return lbis;
+  }
+
+  @Override
+  public List<BlockInfo> findOldBlocksByINodeId(int iNodeId) throws StorageException {
+    HopsSession session = connector.obtainSession();
+    HopsQueryBuilder qb = session.getQueryBuilder();
+    HopsQueryDomainType<BlockInfoDTO> dobj =
+            qb.createQueryDefinition(BlockInfoClusterj.BlockInfoDTO.class);
+
+    HopsPredicate pred1 = dobj.get("iNodeId").equal(dobj.param("iNodeParam"))
+            .and(dobj.get("isOldBlock").equal(dobj.param("isOldBlockParam")));
+    dobj.where(pred1);
+    HopsQuery<BlockInfoDTO> query = session.createQuery(dobj);
+    query.setParameter("iNodeParam", iNodeId);
+    query.setParameter("isOldBlockParam", true);
+
+    List<BlockInfoDTO> dtos = query.getResultList();
+    List<BlockInfo> lbis = createBlockInfoList(dtos);
+
     session.release(dtos);
     return lbis;
   }
@@ -427,7 +468,7 @@ public class BlockInfoClusterj
             bDTO.getINodeId(), bDTO.getNumBytes(), bDTO.getGenerationStamp(),
             bDTO.getBlockUCState(), bDTO.getTimestamp(),
             bDTO.getPrimaryNodeIndex(), bDTO.getBlockRecoveryId(),
-            bDTO.isOldBlock());
+            bDTO.isOldBlock(), bDTO.isOnDemand(), bDTO.isInRotation());
     return hopBlockInfo;
   }
 
@@ -443,5 +484,7 @@ public class BlockInfoClusterj
     persistable.setPrimaryNodeIndex(block.getPrimaryNodeIndex());
     persistable.setBlockRecoveryId(block.getBlockRecoveryId());
     persistable.setOldBlock(block.isOldBlock());
+    persistable.setOnDemand(block.isOnDemand());
+    persistable.setInRotation(block.isInRotation());
   }
 }
